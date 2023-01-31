@@ -1,0 +1,48 @@
+<aura:component implements="flexipage:availableForAllPageTypes,lightning:availableForFlowScreens" access="global">
+    <aura:attribute name="accountName" type="String" access="global"/>
+    <aura:attribute name="accountPhone" type="String" access="global"/>
+    <aura:attribute name="streetAddress" type="String" access="global"/>
+    <aura:attribute name="city" type="String" access="global"/>
+    <aura:attribute name="state" type="String" access="global"/>
+    <aura:attribute name="zipCode" type="String" access="global"/>
+    <aura:attribute name="saveNewInformation" type="Boolean" access="global"/>
+    
+    <aura:attribute name="tempAccountName" type="String" access="global"/>
+    <aura:attribute name="tempAccountPhone" type="String" access="global"/>
+    <aura:attribute name="tempStreetAddress" type="String" access="global"/>
+    <aura:attribute name="tempCity" type="String" access="global"/>
+    <aura:attribute name="tempState" type="String" access="global"/>
+    <aura:attribute name="tempZipCode" type="String" access="global"/>
+    
+    <aura:attribute name="update" type="boolean" default="false" access="global"/>
+	
+    <div>Here is our current Account Shipping information:</div>
+    <br/>
+    <aura:if isTrue="{!v.update}">
+        <lightning:input aura:id="accountName" label="Name" name="newAccountName" value="{!v.accountName}"/>
+        <lightning:input aura:id="accountPhone" label="Phone" name="newAccountPhone" value="{!v.accountPhone}"/>
+        <lightning:input aura:id="streetAddress" label="Street Address" name="newStreetAddress" value="{!v.streetAddress}"/>
+        <lightning:input aura:id="city" label="City" name="newCity" value="{!v.city}"/>
+        <lightning:input aura:id="state" label="State" name="newState" value="{!v.state}"/>
+        <lightning:input aura:id="zipCode" label="Zip Code" name="newZipCode" value="{!v.zipCode}"/>
+        <br/>
+        <lightning:input aura:id="checkbox" type="checkbox" label="Save this as your new address?" name="saveAddress" checked="{!v.saveNewInformation}"/>
+        <br/>
+        <lightning:button variant="neutral" label="Cancel" onclick="{!c.onCancel}"/>
+        <lightning:button variant="brand" label="Save" onclick="{!c.onSave}"/>
+    <aura:set attribute="else">
+        <div class="list-type6">
+            <ul>
+                <li><b>Name: </b> {!v.accountName}</li>
+                <li><b>Phone: </b> {!v.accountPhone}</li>
+                <li><b>Shipping Street Address: </b> {!v.streetAddress}</li>
+            	<li><b>Shipping City: </b> {!v.city}</li>
+                <li><b>Shipping State: </b> {!v.state}</li>
+                <li><b>Shipping Zip Code: </b> {!v.zipCode}</li>
+            </ul>
+        </div>
+        <br/>
+        <lightning:button variant="brand" label="Update Account Information" onclick="{!c.handleClick}"/>
+    </aura:set>    
+    </aura:if>
+</aura:component>

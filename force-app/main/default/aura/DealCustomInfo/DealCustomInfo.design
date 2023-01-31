@@ -1,0 +1,12 @@
+<design:component >
+    <design:attribute name="billingStreetAddress"/>
+    <design:attribute name="billingCity"/>
+    <design:attribute name="billingState"/>
+    <design:attribute name="billingZipCode"/>
+    <design:attribute name="saveBillingInformation"/>
+    <design:attribute name="tempBillingStreetAddress"/>
+    <design:attribute name="tempBillingCity"/>
+    <design:attribute name="tempBillingState"/>
+    <design:attribute name="tempBillingZipCode"/>
+    <design:attribute name="update"/>
+</design:component>

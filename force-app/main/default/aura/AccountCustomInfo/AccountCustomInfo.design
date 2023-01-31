@@ -1,0 +1,16 @@
+<design:component >
+    <design:attribute name="accountName"/>
+    <design:attribute name="accountPhone"/>
+    <design:attribute name="streetAddress"/>
+    <design:attribute name="city"/>
+    <design:attribute name="state"/>
+    <design:attribute name="zipCode"/>
+    <design:attribute name="saveNewInformation"/>
+    <design:attribute name="tempAccountName"/>
+    <design:attribute name="tempAccountPhone"/>
+    <design:attribute name="tempStreetAddress"/>
+    <design:attribute name="tempCity"/>
+    <design:attribute name="tempState"/>
+    <design:attribute name="tempZipCode"/>
+    <design:attribute name="update"/>
+</design:component>

@@ -1,0 +1,41 @@
+<aura:component implements="flexipage:availableForAllPageTypes,lightning:availableForFlowScreens" access="global">
+    <aura:attribute name="billingStreetAddress" type="String" access="global"/>
+    <aura:attribute name="billingCity" type="String" access="global"/>
+    <aura:attribute name="billingState" type="String" access="global"/>
+    <aura:attribute name="billingZipCode" type="String" access="global"/>
+    <aura:attribute name="saveBillingInformation" type="Boolean" access="global"/>
+    
+    <aura:attribute name="tempBillingStreetAddress" type="String" access="global"/>
+    <aura:attribute name="tempBillingCity" type="String" access="global"/>
+    <aura:attribute name="tempBillingState" type="String" access="global"/>
+    <aura:attribute name="tempBillingZipCode" type="String" access="global"/>
+    
+    <aura:attribute name="update" type="boolean" default="false" access="global"/>
+	
+    <div>Here is our current Deal Billing information:</div>
+    <br/>
+    <aura:if isTrue="{!v.update}">
+   
+        <lightning:input aura:id="billingStreetAddress" label="Billing Street Address" name="newBillingStreetAddress" value="{!v.billingStreetAddress}"/>
+        <lightning:input aura:id="billingCity" label="Billing City" name="newBillingCity" value="{!v.billingCity}"/>
+        <lightning:input aura:id="billingState" label="Billing State" name="newBillingState" value="{!v.billingState}"/>
+        <lightning:input aura:id="billingZipCode" label="Billing Zip Code" name="newBillingZipCode" value="{!v.billingZipCode}"/>
+        <br/>
+        <lightning:input aura:id="checkbox" type="checkbox" label="Save this as the Deal Billing Address?" name="saveBillingAddress" checked="{!v.saveBillingInformation}"/>
+        <br/>
+        <lightning:button variant="neutral" label="Cancel" onclick="{!c.onCancel}"/>
+        <lightning:button variant="brand" label="Save" onclick="{!c.onSave}"/>
+    <aura:set attribute="else">
+        <div class="list-type6">
+            <ul>
+                <li><b>Billing Street Address: </b> {!v.billingStreetAddress}</li>
+            	<li><b>Billing City: </b> {!v.billingCity}</li>
+                <li><b>Billing State: </b> {!v.billingState}</li>
+                <li><b>Billing Zip Code: </b> {!v.billingZipCode}</li>
+            </ul>
+        </div>
+        <br/>
+        <lightning:button variant="brand" label="Update Account Information" onclick="{!c.handleClick}"/>
+    </aura:set>    
+    </aura:if>
+</aura:component>
