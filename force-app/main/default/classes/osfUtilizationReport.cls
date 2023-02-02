@@ -2,7 +2,7 @@ public without sharing class osfUtilizationReport {
 
 
     @InvocableMethod(label='Configure Utilization Metric Data' description='Takes in Utiilization Metric Ids, Updates their records to support complicated math')
-    public static List<ID> createUtilizationRecord(List<ID> utilizationMetricIds){
+    public static List<ID> createUtilizationRecord(List<ID> utilizationMetricId){
         List<Utilization_Metric__c> utilizationMetricList = [SELECT ID, Absences__c, Appointments__c, Breaks__c, Overtime__c, Travel_Time__c, Service_Resource__c, Service_Territory__c, Report_End_Date_Time__c, Total_Available_Hours__c, Report_Start_Date_Time__c, Total_NAs__c, Total_Scheduled__c, Total_Travel__c FROM Utilization_Metric__c WHERE ID IN: utilizationMetricIds];
         
         for (Utilization_Metric__c um: utilizationMetricList){
