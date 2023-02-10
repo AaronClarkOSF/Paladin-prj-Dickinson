@@ -31,6 +31,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
 
         Utilization_Metric__c record = findUtilizationMetricRecord(ar);
         putServiceAppointmentDurations(record, ar);
+        putResourceAbsences(record, ar);
         return record;
     }
 
@@ -45,7 +46,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         }
     }
 
-    //a += method to add the ServiceAPpointment Duration by first checking duration type
+    //a sum method to add the Service Appointment Duration by first checking duration type
      private  Utilization_Metric__c putServiceAppointmentDurations(Utilization_Metric__c record, AssignedResource ar){
         if (ar.ServiceAppointment.DurationType == 'Hours'){
             Integer minutes = (Integer) ar.ServiceAppointment.Duration * 60;
@@ -54,6 +55,29 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
             record.Total_Scheduled__c += ar.ServiceAppointment.Duration;
         }
         return record;
+    }
+
+    private Utilization_Metric__c putResourceAbsences (Utilization_Metric__c record, AssignedResource ar){
+        List<ResourceAbsence> resourceAbsences = [SELECT Id, Start, End FROM ResourceAbsence WHERE resourceId =: ar.ServiceResourceId];
+        Long totalMinutesofAbsence;
+        if (resourceAbsences != null && resourceAbsences.size() > 1){
+            totalMinutesofAbsence = minutesOfAbsence(resourceAbsences);
+        }else if(resourceAbsences.size() == 1){
+            totalMinutesofAbsence = (resourceAbsences[0].Start.getTime() - resourceAbsences[0].End.getTime()) /60000;
+        }
+        else{
+            totalMinutesofAbsence = 0;
+        }
+        record.Total_NAs__c = (Integer) totalMinutesofAbsence;
+        return record;
+    }
+
+    private Integer minutesOfAbsence(List<ResourceAbsence> resourceAbsences){
+        Long totalMinutesofAbsence;
+        for (ResourceAbsence ra: resourceAbsences){
+            totalMinutesofAbsence += (resourceAbsences[0].Start.getTime() - resourceAbsences[0].End.getTime())/ 60000;
+        }
+        return (Integer) totalMinutesofAbsence;
     }
 
     //if no U.M. record was found then create new record with Start Date, Service Resource Id, and Service Territory Id
