@@ -1,116 +1,69 @@
 public without sharing class osfUtilizationReport implements Database.Batchable<sObject> {
+    DateTime startDateTime;
+    Date startDate;
 
+    //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         Date today = System.today();
-        String queryString = 'SELECT ID, ServiceAppointmentId, ServiceAppointment.AppointmentNumber, ServiceAppointment.ActualDuration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource  WHERE CREATEDDATE >: Yesterday ';
+        String queryString = 'SELECT ID, ServiceAppointmentId, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource  WHERE CREATEDDATE >: Yesterday ';
         return Database.getQueryLocator(queryString);
-    
     }
 
+    //Perform actions to create or update the existing U.M. records based on Service Resource and Service Territory
     public void execute(Database.BatchableContext BC, List<AssignedResource> scope){
         System.debug('***Batch Started***');
         //call your batch method here, or just write your logic instead.
-       
-       List<Utilization_Metric__c> records = performBatchActions(scope);
-       insert records;
+        List<Utilization_Metric__c> records = new List<Utilization_Metric__c>();
+       for(AssignedResource ar: scope){
+            Utilization_Metric__c record = performBatchActions(ar);
+       }
+       upsert records;
     }
     
+    //send an email with completion information
     public void finish(Database.BatchableContext BC){}
 
 
-    // public static List<Utilization_Metric__c> performBatchActions(List<AssignedResource> scope){
-        
+    //"Parent" method that executes the order of data compilation
+    public Utilization_Metric__c performBatchActions( AssignedResource ar){
+        this.startDateTime = ar.ServiceAppointment.SchedStartTime;
+        this.startDate = Date.newInstance(this.startDateTime.year(), this.startDateTime.month(), this.startDateTime.day());
 
+        Utilization_Metric__c record = findUtilizationMetricRecord(ar);
+        putServiceAppointmentDurations(record, ar);
+        return record;
+    }
 
-    // }
+    //an if/else that locates an existing U.M. record based on Date, Serv. Territory Id, and Service Resource Id
+    private  Utilization_Metric__c findUtilizationMetricRecord (AssignedResource ar){
+        Id serviceTerritoryId =  ar.ServiceAppointment.ServiceTerritoryID;
+        Utilization_Metric__c record = [SELECT ID, Total_Scheduled__c, Service_Resource__c, Report_Start_Date__c, Service_Territory__c  FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId   LIMIT 1];
+        if (record == null){
+            return createUtilizationMetricRecord(ar, serviceTerritoryId);
+        }else{
+            return record;
+        }
+    }
+
+    //a += method to add the ServiceAPpointment Duration by first checking duration type
+     private  Utilization_Metric__c putServiceAppointmentDurations(Utilization_Metric__c record, AssignedResource ar){
+        if (ar.ServiceAppointment.DurationType == 'Hours'){
+            Integer minutes = (Integer) ar.ServiceAppointment.Duration * 60;
+            record.Total_Scheduled__c += minutes;
+        }else{
+            record.Total_Scheduled__c += ar.ServiceAppointment.Duration;
+        }
+        return record;
+    }
+
+    //if no U.M. record was found then create new record with Start Date, Service Resource Id, and Service Territory Id
+    private  Utilization_Metric__c createUtilizationMetricRecord(AssignedResource ar, Id serviceTerritoryId){
+        Utilization_Metric__c newUtilizationMetric = new Utilization_Metric__c();
+        newUtilizationMetric.Report_Start_Date__c = this.startDate;
+        newUtilizationMetric.Service_Resource__c = ar.ServiceResourceId;
+        newUtilizationMetric.Service_Territory__c = serviceTerritoryId;
+
+        return newUtilizationMetric;
+    }
+
 }
-//         List<Utilization_Metric__c> utilizationMetricList = [SELECT ID, Absences__c, Appointments__c, Breaks__c, Overtime__c, Travel_Time__c, Service_Resource__c, Service_Territory__c, Report_End_Date_Time__c, Total_Available_Hours__c, Report_Start_Date_Time__c, Total_NAs__c, Total_Scheduled__c, Total_Travel__c FROM Utilization_Metric__c WHERE ID IN: utilizationMetricIds];
-        
-//         for (Utilization_Metric__c um: utilizationMetricList){
-
-//             //find total avaialable hours using ServiceResourceCapacity: ServiceResourceId, EndDate, StartDate, CapacityInHours
-//             //Total_Available_Hours__c
-
-
-//             if (um.Absences__c){
-//                 //Total_NAs__c
-//                 sumResourceAbsenceData(getAbsenceData(um.Service_Resource__c, um.Report_Start_Date_Time__c, um.Report_End_Date_Time__c));
-//             }
-//             if (um.Appointments__c){
-//                 sumAppointmentData(getAppointmentsData(um.Service_Resource__c, um.Service_Territory__c, um.Report_Start_Date_Time__c, um.Report_End_Date_Time__c));
-//             }
-//             if (um.Breaks__c){
-//                 //Total_NAs__c
-//             }
-//             if(um.Overtime__c){
-                
-//             }
-//             if(um.Travel_Time__c){
-//                 //Total_Travel__c
-//             }
-
-            
-//         }
-
-//         List<ID> successfulResults = new List<ID>();
-
-//         Database.SaveResult [] updateResult = Database.update(utilizationMetricList, false);
-//             for (Database.SaveResult r : updateResult){
-//                 if (r.isSuccess()){
-//                     successfulResults.add(r.Id);
-//                 }else{
-//                     for (Database.Error e : r.getErrors()){ //here you can call those custom object field from A method and assign the value : e.getMessage()
-                    
-//                     }
-//                 }
-//             }
-//             return successfulResults;
-//         }
-
-
-//         private static List<ResourceAbsence> getAbsenceData(ID serviceResource, DateTime startdate, DateTime endDate){
-//             if(endDate != null){
-//                 return [SELECT ID, Start, End FROM ResourceAbsence WHERE ResourceId =:serviceResource AND Start <=: startdate AND End >=: endDate];
-//             }else{
-//                 return [SELECT ID, Start, End FROM ResourceAbsence WHERE ResourceId =:serviceResource AND Start <=: startdate AND End >=: System.Now()];
-//             }
-
-//         }
-
-//         private static List<AssignedResource> getAppointmentsData(ID serviceResource, ID serviceTerritoryId, DateTime startdate, DateTime endDate){
-//             return [SELECT ID, ServiceAppointment.AppointmentNumber, ServiceAppointment.ActualDuration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource WHERE ServiceAppointmentID IN (SELECT Id FROM ServiceAppointment WHERE EarliestStartTime >=: startDate AND EarliestStartTime <=: endDate) AND (ServiceAppointment.ServiceTerritoryID =: serviceTerritoryId) AND (ServiceApointment.Status =: 'Scheduled')];
-//         }  
-
-//         private static void getBreakData(ID serviceResource, ID serviceTerritoryId, DateTime startdate, DateTime endDate){
-        
-//         }  
-
-//         private static void getOvertimeData(ID serviceResource, ID serviceTerritoryId, DateTime startdate, DateTime endDate){
-        
-//         }
-
-//         private static void getTravelTimeData(ID serviceResource, ID serviceTerritoryId, DateTime startdate, DateTime endDate){
-//             return [SELECT ID, ServiceAppointment.AppointmentNumber, ServiceAppointment.ActualTravelTime, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource WHERE ServiceAppointmentID IN (SELECT Id FROM ServiceAppointment WHERE EarliestStartTime >=: startDate AND EarliestStartTime <=: endDate) AND (ServiceAppointment.ServiceTerritoryID =: serviceTerritoryId) AND (ServiceAppointment.Status =: 'Scheduled')];
-
-//         }
-
-//         private static void sumResourceAbsenceData(List<ResourceAbsence> resourceAbsences){
-        
-//         }
-
-//         private static void sumAppointmentData(List<AssignedResource> AssignedResource){
-        
-//         }
-
-//         private static void sumBreakData(List<ResourceAbsence> resourceAbsences){    
-        
-//         }
-
-//         private static void sumOvertimeData(List<ResourceAbsence> resourceAbsences){    
-        
-//         }
-        
-//         private static void sumTravelTimeData(List<ResourceAbsence> resourceAbsences){
-
-//         }
-// }
