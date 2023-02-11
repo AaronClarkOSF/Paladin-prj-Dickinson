@@ -46,12 +46,13 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         record = putTravelTime(record, ar); //using EstimatedTravelTime. In Dev environment no ActualTravelTime is used. Also, to use ActualTravelTime means that we are back updating which isn't true.
         record = putOperatingHours(record, ar);
         return record;
+        //to see the result see Utilization Metric Record's Utilization__c value
     }
 
     //an if/else that locates an existing U.M. record based on Date, Serv. Territory Id, and Service Resource Id
     private  Utilization_Metric__c findUtilizationMetricRecord (AssignedResource ar){
         Id serviceTerritoryId =  ar.ServiceAppointment.ServiceTerritoryID;
-        List<Utilization_Metric__c> records = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Travel__c, Service_Resource__c, Report_Start_Date__c, Service_Territory__c  FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
+        List<Utilization_Metric__c> records = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Report_Start_Date__c, Service_Territory__c  FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
         if (records.size() == 0){
             return createUtilizationMetricRecord(ar, serviceTerritoryId);
         }else{
@@ -69,6 +70,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         newUtilizationMetric.Total_NAs__c = 0;
         newUtilizationMetric.Total_Travel__c = 0;
         newUtilizationMetric.Total_Available_Hours__c = 0;
+        newUtilizationMetric.Total_Available_Minutes__c = 0;
         return newUtilizationMetric;
     }
     
@@ -124,7 +126,8 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
             List<TimeSlot> timeSlots = getTimeSlots(dayOfWeek, operatingHoursId);
             Integer totalHours = getTotalOperatingHours(timeSlots);
             Integer totalMins = totalHours * 60;
-            record.Total_Available_Hours__c = totalMins;
+            record.Total_Available_Hours__c =  totalHours;
+            record.Total_Available_Minutes__c = totalMins;
 
         }else{
             record.Total_Available_Hours__c = 8; // if no operating id is associated with the Service Territory, just make it a standard 8 hours of work so that the calculation doesn't break
@@ -187,6 +190,5 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         }
         return (Integer) totalOperatingHours;
     }
-
 
 }
