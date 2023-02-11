@@ -4,25 +4,35 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
 
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
-        Date today = System.today();
-        String queryString = 'SELECT ID, ServiceAppointmentId, EstimatedTravelTime, ActualTravelTime ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource  WHERE CREATEDDATE >: Yesterday ';
+        System.debug('***Batch Started***');
+        String yesterday = String.valueOf( System.Today()-1);        
+        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource  WHERE lastmodifieddate >= yesterday ';
         return Database.getQueryLocator(queryString);
     }
 
     //Perform actions to create or update the existing U.M. records based on Service Resource and Service Territory
     public void execute(Database.BatchableContext BC, List<AssignedResource> scope){
-        System.debug('***Batch Started***');
+        System.debug('***Batch Excecuted***');
         //call your batch method here, or just write your logic instead.
-        List<Utilization_Metric__c> records = new List<Utilization_Metric__c>();
-        for(AssignedResource ar: scope){
-                Utilization_Metric__c record = performBatchActions(ar);
-                records.add(record);
+        try {
+            List<Utilization_Metric__c> records = new List<Utilization_Metric__c>();
+            for(AssignedResource ar: scope){
+                    Utilization_Metric__c record = new Utilization_Metric__c();
+                    record = performBatchActions(ar);
+                    records.add(record);
+            }
+           upsert records;
+            
+        }catch (Exception e) {
+            System.debug('BATCH ERROR ===> ' + e);
         }
-       upsert records;
     }
+
     
     //send an email with completion information
-    public void finish(Database.BatchableContext BC){}
+    public void finish(Database.BatchableContext BC){
+        System.debug('** BATCH FINISHED** ');
+    }
 
 
     //"Parent" method that executes the order of data compilation
@@ -41,11 +51,11 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //an if/else that locates an existing U.M. record based on Date, Serv. Territory Id, and Service Resource Id
     private  Utilization_Metric__c findUtilizationMetricRecord (AssignedResource ar){
         Id serviceTerritoryId =  ar.ServiceAppointment.ServiceTerritoryID;
-        Utilization_Metric__c record = [SELECT ID, Total_Scheduled__c, Service_Resource__c, Report_Start_Date__c, Service_Territory__c  FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId   LIMIT 1];
-        if (record == null){
+        List<Utilization_Metric__c> records = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Travel__c, Service_Resource__c, Report_Start_Date__c, Service_Territory__c  FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
+        if (records.size() == 0){
             return createUtilizationMetricRecord(ar, serviceTerritoryId);
         }else{
-            return record;
+            return records[0];
         }
     }
 
@@ -55,7 +65,10 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         newUtilizationMetric.Report_Start_Date__c = this.startDate;
         newUtilizationMetric.Service_Resource__c = ar.ServiceResourceId;
         newUtilizationMetric.Service_Territory__c = serviceTerritoryId;
-
+        newUtilizationMetric.Total_Scheduled__c = 0;
+        newUtilizationMetric.Total_NAs__c = 0;
+        newUtilizationMetric.Total_Travel__c = 0;
+        newUtilizationMetric.Total_Available_Hours__c = 0;
         return newUtilizationMetric;
     }
     
@@ -108,9 +121,14 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         String dayOfWeek = getDayOfWeek(getDayOfWeekInt());
         Id operatingHoursId = getOperatingHoursId(record.Service_Territory__c);
         if (operatingHoursId != null){
-            record.Total_Available_Hours__c = getTotalOperatingHours(getTimeSlots(dayOfWeek, operatingHoursId));
-        }
+            List<TimeSlot> timeSlots = getTimeSlots(dayOfWeek, operatingHoursId);
+            Integer totalHours = getTotalOperatingHours(timeSlots);
+            Integer totalMins = totalHours * 60;
+            record.Total_Available_Hours__c = totalMins;
 
+        }else{
+            record.Total_Available_Hours__c = 8; // if no operating id is associated with the Service Territory, just make it a standard 8 hours of work so that the calculation doesn't break
+        }
         return record;
     }
 
@@ -163,11 +181,11 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
 
     //utilizes a custom field found on TimeSlots and multiplying the found hours by 60 to return minutes of operation given the timeslots
     private Integer getTotalOperatingHours(List<TimeSlot> timeSlots){
-        Integer totalOperatingHours;
+        Decimal totalOperatingHours = 0;
         for (TimeSlot ts: timeSlots){
-            totalOperatingHours += (Integer)ts.Total_Hours__c * 60; 
+            totalOperatingHours += ts.Total_Hours__c; 
         }
-        return totalOperatingHours;
+        return (Integer) totalOperatingHours;
     }
 
 
