@@ -5,7 +5,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         Date today = System.today();
-        String queryString = 'SELECT ID, ServiceAppointmentId, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource  WHERE CREATEDDATE >: Yesterday ';
+        String queryString = 'SELECT ID, ServiceAppointmentId, EstimatedTravelTime, ActualTravelTime ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource  WHERE CREATEDDATE >: Yesterday ';
         return Database.getQueryLocator(queryString);
     }
 
@@ -14,9 +14,10 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         System.debug('***Batch Started***');
         //call your batch method here, or just write your logic instead.
         List<Utilization_Metric__c> records = new List<Utilization_Metric__c>();
-       for(AssignedResource ar: scope){
-            Utilization_Metric__c record = performBatchActions(ar);
-       }
+        for(AssignedResource ar: scope){
+                Utilization_Metric__c record = performBatchActions(ar);
+                records.add(record);
+        }
        upsert records;
     }
     
@@ -30,8 +31,10 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         this.startDate = Date.newInstance(this.startDateTime.year(), this.startDateTime.month(), this.startDateTime.day());
 
         Utilization_Metric__c record = findUtilizationMetricRecord(ar);
-        putServiceAppointmentDurations(record, ar);
-        putResourceAbsences(record, ar);
+        record = putServiceAppointmentDurations(record, ar);
+        record = putResourceAbsences(record, ar);
+        record = putTravelTime(record, ar); //using EstimatedTravelTime. In Dev environment no ActualTravelTime is used. Also, to use ActualTravelTime means that we are back updating which isn't true.
+        record = putOperatingHours(record, ar);
         return record;
     }
 
@@ -57,28 +60,40 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         return record;
     }
 
+    //a method for putting all the Resource Absences of a Service Resource onto the U.M. record
     private Utilization_Metric__c putResourceAbsences (Utilization_Metric__c record, AssignedResource ar){
-        List<ResourceAbsence> resourceAbsences = [SELECT Id, Start, End FROM ResourceAbsence WHERE resourceId =: ar.ServiceResourceId];
-        Long totalMinutesofAbsence;
+        List<ResourceAbsence> resourceAbsences = [SELECT Id, Start, End, FSL__Duration_In_Minutes__c FROM ResourceAbsence WHERE resourceId =: ar.ServiceResourceId AND Start_Day__c =: this.startDate];
+        Integer totalMinutesofAbsence;
         if (resourceAbsences != null && resourceAbsences.size() > 1){
             totalMinutesofAbsence = minutesOfAbsence(resourceAbsences);
         }else if(resourceAbsences.size() == 1){
-            totalMinutesofAbsence = (resourceAbsences[0].Start.getTime() - resourceAbsences[0].End.getTime()) /60000;
+            totalMinutesofAbsence = (Integer) resourceAbsences[0].FSL__Duration_In_Minutes__c;
         }
         else{
             totalMinutesofAbsence = 0;
         }
-        record.Total_NAs__c = (Integer) totalMinutesofAbsence;
+        record.Total_NAs__c = totalMinutesofAbsence;
         return record;
     }
 
+    //helper method of putResourceAbsences. It is if there are many Resource Absences on the same day.
     private Integer minutesOfAbsence(List<ResourceAbsence> resourceAbsences){
-        Long totalMinutesofAbsence;
+        Integer totalMinutesofAbsence;
         for (ResourceAbsence ra: resourceAbsences){
-            totalMinutesofAbsence += (resourceAbsences[0].Start.getTime() - resourceAbsences[0].End.getTime())/ 60000;
+            totalMinutesofAbsence += (Integer) resourceAbsences[0].FSL__Duration_In_Minutes__c;
         }
-        return (Integer) totalMinutesofAbsence;
+        return totalMinutesofAbsence;
     }
+
+    private Utilization_Metric__c putTravelTime (Utilization_Metric__c record, AssignedResource ar){
+        record.Total_Travel__c = ar.EstimatedTravelTime;
+        return record;
+    }
+
+    private Id getOperatingHoursId(Id serviceTerritoryId){
+
+    }
+
 
     //if no U.M. record was found then create new record with Start Date, Service Resource Id, and Service Territory Id
     private  Utilization_Metric__c createUtilizationMetricRecord(AssignedResource ar, Id serviceTerritoryId){
