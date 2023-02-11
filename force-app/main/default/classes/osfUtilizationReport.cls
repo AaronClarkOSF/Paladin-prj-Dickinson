@@ -49,6 +49,17 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         }
     }
 
+    //if no U.M. record was found then create new record with Start Date, Service Resource Id, and Service Territory Id
+    private  Utilization_Metric__c createUtilizationMetricRecord(AssignedResource ar, Id serviceTerritoryId){
+        Utilization_Metric__c newUtilizationMetric = new Utilization_Metric__c();
+        newUtilizationMetric.Report_Start_Date__c = this.startDate;
+        newUtilizationMetric.Service_Resource__c = ar.ServiceResourceId;
+        newUtilizationMetric.Service_Territory__c = serviceTerritoryId;
+
+        return newUtilizationMetric;
+    }
+    
+
     //a sum method to add the Service Appointment Duration by first checking duration type
      private  Utilization_Metric__c putServiceAppointmentDurations(Utilization_Metric__c record, AssignedResource ar){
         if (ar.ServiceAppointment.DurationType == 'Hours'){
@@ -85,24 +96,79 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         return totalMinutesofAbsence;
     }
 
+    //a method for putting the Travel Time onto U.M.
     private Utilization_Metric__c putTravelTime (Utilization_Metric__c record, AssignedResource ar){
         record.Total_Travel__c = ar.EstimatedTravelTime;
         return record;
     }
 
+    //a method to run calculations to find the Operating Hours associated with U.M. Service Territory, Day Of Week, and then to get the total time (in minutes) associated with 
+    //those factors. Placing them onto the U.M. record.
+    private Utilization_Metric__c putOperatingHours (Utilization_Metric__c record, AssignedResource ar){
+        String dayOfWeek = getDayOfWeek(getDayOfWeekInt());
+        Id operatingHoursId = getOperatingHoursId(record.Service_Territory__c);
+        if (operatingHoursId != null){
+            record.Total_Available_Hours__c = getTotalOperatingHours(getTimeSlots(dayOfWeek, operatingHoursId));
+        }
+
+        return record;
+    }
+
+    //needed to understand what timeslots are associated, indirectly, to the Service Territory given the assigned OperatingHoursId.
     private Id getOperatingHoursId(Id serviceTerritoryId){
-
+        ServiceTerritory st = [SELECT Id, OperatingHoursId FROM ServiceTerritory WHERE Id =: serviceTerritoryId];
+        return st.OperatingHoursId;
     }
 
-
-    //if no U.M. record was found then create new record with Start Date, Service Resource Id, and Service Territory Id
-    private  Utilization_Metric__c createUtilizationMetricRecord(AssignedResource ar, Id serviceTerritoryId){
-        Utilization_Metric__c newUtilizationMetric = new Utilization_Metric__c();
-        newUtilizationMetric.Report_Start_Date__c = this.startDate;
-        newUtilizationMetric.Service_Resource__c = ar.ServiceResourceId;
-        newUtilizationMetric.Service_Territory__c = serviceTerritoryId;
-
-        return newUtilizationMetric;
+    //a way to find the day of week given a datetime
+    private Integer getDayOfWeekInt(){
+        return Integer.valueOf((this.startDateTime.format('u')));
     }
+
+    //a switch statement to return day of week.
+    private String getDayOfWeek(Integer dayInt){
+        switch on dayInt {
+            when 1 {
+                return 'Monday';
+            }
+            when 2 {
+                return 'Tuesday';
+            }
+            when 3 {
+                return 'Wednesday';
+            }
+            when 4 {
+                return 'Thursday';
+            }
+            when 5 {
+                return 'Friday';
+            }
+            when 6 {
+                return 'Saturday';
+            }
+            when 7 {
+                return 'Sunday';
+            }
+            when else {
+               return 'Monday';
+            }
+         }
+    }
+
+    //returns the list of time slots given the operatinghoursId and the day of week.
+    private List<TimeSlot> getTimeSlots(String day, Id operationHoursId){
+        List<TimeSlot> timeSlots = [SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day];
+        return timeSlots;
+    }
+
+    //utilizes a custom field found on TimeSlots and multiplying the found hours by 60 to return minutes of operation given the timeslots
+    private Integer getTotalOperatingHours(List<TimeSlot> timeSlots){
+        Integer totalOperatingHours;
+        for (TimeSlot ts: timeSlots){
+            totalOperatingHours += (Integer)ts.Total_Hours__c * 60; 
+        }
+        return totalOperatingHours;
+    }
+
 
 }
