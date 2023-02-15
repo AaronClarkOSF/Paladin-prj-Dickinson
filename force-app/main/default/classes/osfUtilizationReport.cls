@@ -5,8 +5,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String yesterday = String.valueOf( System.Today()-1);        
-        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource  WHERE lastmodifieddate >= yesterday ';
+        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource  WHERE Created_Utilization_Metric__c = false';
         return Database.getQueryLocator(queryString);
     }
 
@@ -20,8 +19,10 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
                     Utilization_Metric__c record = new Utilization_Metric__c();
                     record = performBatchActions(ar);
                     records.add(record);
+                    ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
             }
-           upsert records;
+            update scope;
+            upsert records;
             
         }catch (Exception e) {
             System.debug('BATCH ERROR ===> ' + e);
@@ -56,11 +57,12 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         if (records.size() == 0){
             return createUtilizationMetricRecord(ar, serviceTerritoryId);
         }else{
+            System.debug('the record st that we found was  ' + records[0].Service_Territory__c);
             return records[0];
         }
     }
 
-    //if no U.M. record was found then create new record with Start Date, Service Resource Id, and Service Territory Id
+    //if no U.M. record was found then create new record with Start Date, Service Resource Id, and Service Territory Id, and the minutes of the times
     private  Utilization_Metric__c createUtilizationMetricRecord(AssignedResource ar, Id serviceTerritoryId){
         Utilization_Metric__c newUtilizationMetric = new Utilization_Metric__c();
         newUtilizationMetric.Report_Start_Date__c = this.startDate;
@@ -71,6 +73,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         newUtilizationMetric.Total_Travel__c = 0;
         newUtilizationMetric.Total_Available_Hours__c = 0;
         newUtilizationMetric.Total_Available_Minutes__c = 0;
+        System.debug('the serviceTerritoryId that we made was  ' + newUtilizationMetric.Service_Territory__c);
         return newUtilizationMetric;
     }
     
@@ -123,6 +126,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         String dayOfWeek = getDayOfWeek(getDayOfWeekInt());
         Id operatingHoursId = getOperatingHoursId(record.Service_Territory__c);
         if (operatingHoursId != null){
+            System.debug('the operating hours id is ' + operatingHoursId);
             List<TimeSlot> timeSlots = getTimeSlots(dayOfWeek, operatingHoursId);
             Integer totalHours = getTotalOperatingHours(timeSlots);
             Integer totalMins = totalHours * 60;
@@ -137,8 +141,12 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
 
     //needed to understand what timeslots are associated, indirectly, to the Service Territory given the assigned OperatingHoursId.
     private Id getOperatingHoursId(Id serviceTerritoryId){
-        ServiceTerritory st = [SELECT Id, OperatingHoursId FROM ServiceTerritory WHERE Id =: serviceTerritoryId];
-        return st.OperatingHoursId;
+        if (serviceTerritoryId != null){
+            ServiceTerritory st = [SELECT Id, OperatingHoursId FROM ServiceTerritory WHERE Id =: serviceTerritoryId];
+            return st.OperatingHoursId;
+        }else{
+            return null;
+        }
     }
 
     //a way to find the day of week given a datetime
