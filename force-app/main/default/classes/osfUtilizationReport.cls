@@ -1,6 +1,8 @@
 public without sharing class osfUtilizationReport implements Database.Batchable<sObject> {
     DateTime startDateTime;
     Date startDate;
+    List<Utilization_Metric__c> records = new List<Utilization_Metric__c>();
+
 
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
@@ -14,15 +16,16 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         System.debug('***Batch Excecuted***');
         //call your batch method here, or just write your logic instead.
         try {
-            List<Utilization_Metric__c> records = new List<Utilization_Metric__c>();
             for(AssignedResource ar: scope){
                     Utilization_Metric__c record = new Utilization_Metric__c();
                     record = performBatchActions(ar);
-                    records.add(record);
+                    this.records.add(record);
                     ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
-            }
+                    System.debug('the ar scope id of this is ' + ar.id);
+                    System.debug('the record records id of this is ' + record.id);
+                }
             update scope;
-            upsert records;
+            upsert this.records;
             
         }catch (Exception e) {
             System.debug('BATCH ERROR ===> ' + e);
@@ -53,13 +56,21 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //an if/else that locates an existing U.M. record based on Date, Serv. Territory Id, and Service Resource Id
     private  Utilization_Metric__c findUtilizationMetricRecord (AssignedResource ar){
         Id serviceTerritoryId =  ar.ServiceAppointment.ServiceTerritoryID;
-        List<Utilization_Metric__c> records = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Report_Start_Date__c, Service_Territory__c  FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
-        if (records.size() == 0){
+        List<Utilization_Metric__c> umRecords = new List<Utilization_Metric__c>();
+        umRecords = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Report_Start_Date__c, Service_Territory__c  FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
+        if (umRecords.size() == 0){ //no U.M. record was ever made in the past so make one
             return createUtilizationMetricRecord(ar, serviceTerritoryId);
         }else{
-            System.debug('the record st that we found was  ' + records[0].Service_Territory__c);
-            return records[0];
+            for (Integer i = 0; i <this.records.size(); i++){ // one U.M. was already made during this batch (either made or found with umRecords[0] see below) and we should be re-reupdating it
+                if (this.records[i].Id == umRecords[0].Id){
+                    Utilization_Metric__c recordAlreadyMade = this.records[i];
+                    this.records.remove(i);
+                    return recordAlreadyMade;
+                }
+            }
         }
+        System.debug('the record st that we found was  ' + records[0].Service_Territory__c);
+        return umRecords[0]; // no U.M. record was made in this batch  but one had been made previously
     }
 
     //if no U.M. record was found then create new record with Start Date, Service Resource Id, and Service Territory Id, and the minutes of the times
