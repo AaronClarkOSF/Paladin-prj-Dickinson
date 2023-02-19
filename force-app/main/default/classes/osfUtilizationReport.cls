@@ -22,8 +22,8 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
                     record = performBatchActions(ar);
                     this.records.add(record);
                     ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
-                    System.debug('the ar scope id of this is ' + ar.id);
-                    System.debug('the record records id of this is ' + record.id);
+                    // System.debug('the ar scope id of this is ' + ar.id);
+                    // System.debug('the record records id of this is ' + record.id);
                 }
             update scope;
             upsert this.records;
@@ -122,9 +122,9 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
 
     //helper method of putResourceAbsences. It is if there are many Resource Absences on the same day.
     private Integer minutesOfAbsence(List<ResourceAbsence> resourceAbsences){
-        Integer totalMinutesofAbsence;
+        Integer totalMinutesofAbsence = 0;
         for (ResourceAbsence ra: resourceAbsences){
-            totalMinutesofAbsence += (Integer) resourceAbsences[0].FSL__Duration_In_Minutes__c;
+            totalMinutesofAbsence += (Integer) ra.FSL__Duration_In_Minutes__c;
         }
         return totalMinutesofAbsence;
     }
