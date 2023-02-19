@@ -1,0 +1,55 @@
+{
+  "summary": {
+    "outcome": "Failed",
+    "testsRan": 1,
+    "passing": 0,
+    "failing": 1,
+    "skipped": 0,
+    "passRate": "0%",
+    "failRate": "100%",
+    "skipRate": "0%",
+    "testStartTime": "Sun Feb 19 2023 10:50:36 AM",
+    "testExecutionTimeInMs": 0,
+    "testTotalTimeInMs": 0,
+    "commandTimeInMs": 292,
+    "hostname": "https://dickinson--osfdev.sandbox.my.salesforce.com",
+    "orgId": "00D56000000LEeMEAW",
+    "username": "aaron.clark@osf.digital.osfdev",
+    "testRunId": "7075600002Ki76A",
+    "userId": "00556000009oEuTAAU",
+    "totalLines": 0,
+    "coveredLines": 0,
+    "testRunCoverage": "0%",
+    "orgWideCoverage": "4%"
+  },
+  "tests": [
+    {
+      "id": "07M5600000JlpAmEAJ",
+      "queueItemId": "70956000003CAYTAA4",
+      "stackTrace": "Class.osfUtilizationReportTest.assResourceSetup: line 18, column 1",
+      "message": "System.DmlException: Insert failed. First exception on row 0; first error: FIELD_CUSTOM_VALIDATION_EXCEPTION, Both scheduled start and end are required: [SchedEndTime]",
+      "asyncApexJobId": "7075600002Ki76AAAR",
+      "methodName": "scheduleJobTest",
+      "outcome": "Fail",
+      "apexLogId": null,
+      "apexClass": {
+        "id": "01p5600000H4c8LAAR",
+        "name": "osfUtilizationReportTest",
+        "namespacePrefix": null,
+        "fullName": "osfUtilizationReportTest"
+      },
+      "runTime": 0,
+      "testTimestamp": "2023-02-19T15:50:43.000+0000",
+      "fullName": "osfUtilizationReportTest.scheduleJobTest",
+      "diagnostic": {
+        "exceptionMessage": "System.DmlException: Insert failed. First exception on row 0; first error: FIELD_CUSTOM_VALIDATION_EXCEPTION, Both scheduled start and end are required: [SchedEndTime]",
+        "exceptionStackTrace": "Class.osfUtilizationReportTest.assResourceSetup: line 18, column 1",
+        "className": "osfUtilizationReportTest",
+        "compileProblem": "",
+        "lineNumber": 18,
+        "columnNumber": 1
+      }
+    }
+  ],
+  "codecoverage": []
+}
