@@ -7,13 +7,14 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceResource.Name FROM AssignedResource  WHERE Created_Utilization_Metric__c = false';
+        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceAppointment.ServiceTerritory.Name, ServiceResource.Name FROM AssignedResource  WHERE Created_Utilization_Metric__c = false';
         return Database.getQueryLocator(queryString);
     }
 
     //Perform actions to create or update the existing U.M. records based on Service Resource and Service Territory
     public void execute(Database.BatchableContext BC, List<AssignedResource> scope){
         System.debug('***Batch Excecuted***');
+        System.debug('the scope is ' + scope.size());
         //call your batch method here, or just write your logic instead.
         try {
             for(AssignedResource ar: scope){
@@ -57,34 +58,36 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     private  Utilization_Metric__c findUtilizationMetricRecord (AssignedResource ar){
         Id serviceTerritoryId =  ar.ServiceAppointment.ServiceTerritoryID;
         List<Utilization_Metric__c> umRecords = new List<Utilization_Metric__c>();
-        umRecords = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Report_Start_Date__c, Service_Territory__c  FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
+        umRecords = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Service_Resource_Name__c, Report_Start_Date__c, Service_Territory__c , Service_Territory_Name__c FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
         if (umRecords.size() == 0){ //no U.M. record was ever made in the past so make one
-            return createUtilizationMetricRecord(ar, serviceTerritoryId);
+            return createUtilizationMetricRecord(ar);
         }else{
-            for (Integer i = 0; i <this.records.size(); i++){ // one U.M. was already made during this batch (either made or found with umRecords[0] see below) and we should be re-reupdating it
+           /* for (Integer i = 0; i <this.records.size(); i++){ // one U.M. was already made during this batch (either made or found with umRecords[0] see below) and we should be re-reupdating it
                 if (this.records[i].Id == umRecords[0].Id){
                     Utilization_Metric__c recordAlreadyMade = this.records[i];
                     this.records.remove(i);
                     return recordAlreadyMade;
                 }
             }
-        }
-        System.debug('the record st that we found was  ' + records[0].Service_Territory__c);
-        return umRecords[0]; // no U.M. record was made in this batch  but one had been made previously
+        }*/
+            System.debug('the record st that we found was  ' + records[0].Service_Territory__c);
+            return umRecords[0]; // no U.M. record was made in this batch  but one had been made previously
+        }   
     }
 
-    //if no U.M. record was found then create new record with Start Date, Service Resource Id, and Service Territory Id, and the minutes of the times
-    private  Utilization_Metric__c createUtilizationMetricRecord(AssignedResource ar, Id serviceTerritoryId){
+    //if no U.M. record was found then create new record with Start Date, Service Resource Id/  Name, and Service Territory Id/Name, and the minutes of the times
+    private  Utilization_Metric__c createUtilizationMetricRecord(AssignedResource ar){
         Utilization_Metric__c newUtilizationMetric = new Utilization_Metric__c();
         newUtilizationMetric.Report_Start_Date__c = this.startDate;
         newUtilizationMetric.Service_Resource__c = ar.ServiceResourceId;
-        newUtilizationMetric.Service_Territory__c = serviceTerritoryId;
+        newUtilizationMetric.Service_Territory__c =  ar.ServiceAppointment.ServiceTerritoryID;
         newUtilizationMetric.Total_Scheduled__c = 0;
         newUtilizationMetric.Total_NAs__c = 0;
         newUtilizationMetric.Total_Travel__c = 0;
         newUtilizationMetric.Total_Available_Hours__c = 0;
         newUtilizationMetric.Total_Available_Minutes__c = 0;
-        System.debug('the serviceTerritoryId that we made was  ' + newUtilizationMetric.Service_Territory__c);
+        newUtilizationMetric.Service_Territory_Name__c = ar.ServiceAppointment.ServiceTerritory.Name;
+        newUtilizationMetric.Service_Resource_Name__c = ar.ServiceResource.Name;
         return newUtilizationMetric;
     }
     
@@ -142,10 +145,15 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
             Integer totalHours = getTotalOperatingHours(timeSlots);
             Integer totalMins = totalHours * 60;
             record.Total_Available_Hours__c =  totalHours;
-            record.Total_Available_Minutes__c = totalMins;
+            if(totalMins != 0){ // there is still a chance, after testing, that Operating Hours could retun 0. So we are doing another check and giving the U.M. Record a base of 8 hours (480 mins).
+                record.Total_Available_Minutes__c = totalMins;
+            }else{
+                record.Total_Available_Minutes__c = 480;
+            }
 
         }else{
             record.Total_Available_Hours__c = 8; // if no operating id is associated with the Service Territory, just make it a standard 8 hours of work so that the calculation doesn't break
+            record.Total_Available_Minutes__c = 480;
         }
         return record;
     }
