@@ -43,7 +43,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //"Parent" method that executes the order of data compilation
     public Utilization_Metric__c performBatchActions( AssignedResource ar){
         this.startDateTime = ar.ServiceAppointment.SchedStartTime;
-        this.startDate = Date.newInstance(this.startDateTime.year(), this.startDateTime.month(), this.startDateTime.day());
+        this.startDate = this.startDateTime.dateGMT();
 
         Utilization_Metric__c record = findUtilizationMetricRecord(ar);
         record = putServiceAppointmentDurations(record, ar);
@@ -88,6 +88,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         newUtilizationMetric.Total_Available_Minutes__c = 0;
         newUtilizationMetric.Service_Territory_Name__c = ar.ServiceAppointment.ServiceTerritory.Name;
         newUtilizationMetric.Service_Resource_Name__c = ar.ServiceResource.Name;
+        newUtilizationMetric.Test_Assigned_Resource__c = ar.Id;
         return newUtilizationMetric;
     }
     
@@ -130,7 +131,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
 
     //a method for putting the Travel Time onto U.M.
     private Utilization_Metric__c putTravelTime (Utilization_Metric__c record, AssignedResource ar){
-        record.Total_Travel__c = ar.EstimatedTravelTime;
+        record.Total_Travel__c += ar.EstimatedTravelTime;
         return record;
     }
 
