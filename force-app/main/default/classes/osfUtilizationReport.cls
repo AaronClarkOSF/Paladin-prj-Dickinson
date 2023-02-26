@@ -7,7 +7,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceAppointment.ServiceTerritory.Name, ServiceResource.Name FROM AssignedResource  WHERE Created_Utilization_Metric__c = false' + (Test.isRunningTest()?' LIMIT 5':'');
+        String queryString = 'SELECT ID, Date_Value_EffectiveStartDate__c, Date_Value_EffectiveEndDate__c, EffectiveEndDate, ServiceTerritoryId, ServiceResourceId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (Is_the_StartDate_a_Year_Or_Older__c = True AND Effectiveenddate = null) OR LastModifiedDate = TODAY';
         return Database.getQueryLocator(queryString);
     }
 
@@ -17,16 +17,10 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         System.debug('the scope is ' + scope.size());
         //call your batch method here, or just write your logic instead.
         try {
-            for(AssignedResource ar: scope){
-                    Utilization_Metric__c record = new Utilization_Metric__c();
-                    record = performBatchActions(ar);
-                    this.records.add(record);
-                    ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
-                    // System.debug('the ar scope id of this is ' + ar.id);
-                    // System.debug('the record records id of this is ' + record.id);
+            for(ServiceTerritoryMember stm: scope){
+                    this.records = performBatchActions(stm);
                 }
-            update scope;
-            upsert this.records;
+            insert this.records;
             
         }catch (Exception e) {
             System.debug('BATCH ERROR ===> ' + e);
@@ -41,105 +35,54 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
 
 
     //"Parent" method that executes the order of data compilation
-    public Utilization_Metric__c performBatchActions( AssignedResource ar){
-        this.startDateTime = ar.ServiceAppointment.SchedStartTime;
-        this.startDate = this.startDateTime.dateGMT();
-
-        Utilization_Metric__c record = findUtilizationMetricRecord(ar);
-        record = putServiceAppointmentDurations(record, ar);
-        record = putResourceAbsences(record, ar);
-        record = putTravelTime(record, ar); //using EstimatedTravelTime. In Dev environment no ActualTravelTime is used. Also, to use ActualTravelTime means that we are back updating which isn't true.
-        record = putOperatingHours(record, ar);
-        return record;
-        //to see the result see Utilization Metric Record's Utilization__c value
+    public void performBatchActions( ServiceTerritoryMember stm){
+         this.records.add(findUtilizationMetricRecord(stm));
     }
 
     //an if/else that locates an existing U.M. record based on Date, Serv. Territory Id, and Service Resource Id
-    private  Utilization_Metric__c findUtilizationMetricRecord (AssignedResource ar){
-        Id serviceTerritoryId =  ar.ServiceAppointment.ServiceTerritoryID;
-        List<Utilization_Metric__c> umRecords = new List<Utilization_Metric__c>();
-        umRecords = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Service_Resource_Name__c, Report_Start_Date__c, Service_Territory__c , Service_Territory_Name__c FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
+    private  List<Utilization_Metric__c> findUtilizationMetricRecord (ServiceTerritoryMember stm){
+        List<Utilization_Metric__c>  umRecords = new List<Utilization_Metric__c>();
+            umRecords = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Service_Resource_Name__c, Report_Start_Date__c, Service_Territory__c , Service_Territory_Name__c FROM
+            Utilization_Metric__c WHERE Service_Resource__c =: stm.ServiceResourceId AND Service_Territory__c =: stm.ServiceTerritoryID AND  Report_Start_Date__c >=: TODAY AND 
+                Report_Start_Date__c <=: Date_Value_EffectiveEndDate__c];
+            //if you find UM that are greater than today, but less than the Effective end date, delete them and then recreate them.
         if (umRecords.size() == 0){ //no U.M. record was ever made in the past so make one
-            return createUtilizationMetricRecord(ar);
+            return createUtilizationMetricRecords(stm, stm.Date_Value_EffectiveStartDate__c, stm.Date_Value_EffectiveEndDate__c);// aka create a set of Utilization Metric records as that means its probably a net new STM record.
         }else{
-           /* for (Integer i = 0; i <this.records.size(); i++){ // one U.M. was already made during this batch (either made or found with umRecords[0] see below) and we should be re-reupdating it
-                if (this.records[i].Id == umRecords[0].Id){
-                    Utilization_Metric__c recordAlreadyMade = this.records[i];
-                    this.records.remove(i);
-                    return recordAlreadyMade;
-                }
-            }
-        }*/
-            System.debug('the record st that we found was  ' + records[0].Service_Territory__c);
-            return umRecords[0]; // no U.M. record was made in this batch  but one had been made previously
+            delete umRecords;
+            return createUtilizationMetricRecord(stm, Sytem.Today(), stm.Date_Value_EffectiveEndDate__c);
+            
         }   
     }
 
     //if no U.M. record was found then create new record with Start Date, Service Resource Id/  Name, and Service Territory Id/Name, and the minutes of the times
-    private  Utilization_Metric__c createUtilizationMetricRecord(AssignedResource ar){
-        Utilization_Metric__c newUtilizationMetric = new Utilization_Metric__c();
-        newUtilizationMetric.Report_Start_Date__c = this.startDate;
-        newUtilizationMetric.Service_Resource__c = ar.ServiceResourceId;
-        newUtilizationMetric.Service_Territory__c =  ar.ServiceAppointment.ServiceTerritoryID;
-        newUtilizationMetric.Total_Scheduled__c = 0;
-        newUtilizationMetric.Total_NAs__c = 0;
-        newUtilizationMetric.Total_Travel__c = 0;
-        newUtilizationMetric.Total_Available_Hours__c = 0;
-        newUtilizationMetric.Total_Available_Minutes__c = 0;
-        newUtilizationMetric.Service_Territory_Name__c = ar.ServiceAppointment.ServiceTerritory.Name;
-        newUtilizationMetric.Service_Resource_Name__c = ar.ServiceResource.Name;
-        newUtilizationMetric.Test_Assigned_Resource__c = ar.Id;
-        return newUtilizationMetric;
+    private  List<Utilization_Metric__c> createUtilizationMetricRecords(ServiceTerritoryMember stm, Date startDay, Date endDay){
+        List<Utilization_Metric__c> umRecords = new List<Utilization_Metric__c>();
+        Integer numberOfDays = (startDay.daysBetween(endDay));
+        for (int i = 0; i < numberOfDays; i++){
+            Utilization_Metric__c newUtilizationMetric = new Utilization_Metric__c();
+            newUtilizationMetric.Report_Start_Date__c = startDay + i;
+            newUtilizationMetric.Service_Resource__c = stm.ServiceResourceId;
+            newUtilizationMetric.Service_Territory__c =  stm.ServiceTerritoryID;
+            newUtilizationMetric.Total_Scheduled__c = 0;
+            newUtilizationMetric.Total_NAs__c = 0;
+            newUtilizationMetric.Total_Travel__c = 0;
+            newUtilizationMetric.Service_Territory_Name__c = stm.ServiceTerritory.Name;
+            newUtilizationMetric.Service_Resource_Name__c = stm.ServiceResource.Name;
+            newUtilizationMetric.Test_Assigned_Resource__c = stm.ServiceResourceId;
+            newUtilizationMetric = putOperatingHours(newUtilizationMetric, stm);
+            umRecords.add(newUtilizationMetric);
+            }
+        return umRecords;
     }
     
 
-    //a sum method to add the Service Appointment Duration by first checking duration type
-     private  Utilization_Metric__c putServiceAppointmentDurations(Utilization_Metric__c record, AssignedResource ar){
-        if (ar.ServiceAppointment.DurationType == 'Hours'){
-            Integer minutes = (Integer) ar.ServiceAppointment.Duration * 60;
-            record.Total_Scheduled__c += minutes;
-        }else{
-            record.Total_Scheduled__c += ar.ServiceAppointment.Duration;
-        }
-        return record;
-    }
-
-    //a method for putting all the Resource Absences of a Service Resource onto the U.M. record
-    private Utilization_Metric__c putResourceAbsences (Utilization_Metric__c record, AssignedResource ar){
-        List<ResourceAbsence> resourceAbsences = [SELECT Id, Start, End, FSL__Duration_In_Minutes__c FROM ResourceAbsence WHERE resourceId =: ar.ServiceResourceId AND Start_Day__c =: this.startDate];
-        Integer totalMinutesofAbsence;
-        if (resourceAbsences != null && resourceAbsences.size() > 1){
-            totalMinutesofAbsence = minutesOfAbsence(resourceAbsences);
-        }else if(resourceAbsences.size() == 1){
-            totalMinutesofAbsence = (Integer) resourceAbsences[0].FSL__Duration_In_Minutes__c;
-        }
-        else{
-            totalMinutesofAbsence = 0;
-        }
-        record.Total_NAs__c = totalMinutesofAbsence;
-        return record;
-    }
-
-    //helper method of putResourceAbsences. It is if there are many Resource Absences on the same day.
-    private Integer minutesOfAbsence(List<ResourceAbsence> resourceAbsences){
-        Integer totalMinutesofAbsence = 0;
-        for (ResourceAbsence ra: resourceAbsences){
-            totalMinutesofAbsence += (Integer) ra.FSL__Duration_In_Minutes__c;
-        }
-        return totalMinutesofAbsence;
-    }
-
-    //a method for putting the Travel Time onto U.M.
-    private Utilization_Metric__c putTravelTime (Utilization_Metric__c record, AssignedResource ar){
-        record.Total_Travel__c += ar.EstimatedTravelTime;
-        return record;
-    }
-
+   
     //a method to run calculations to find the Operating Hours associated with U.M. Service Territory, Day Of Week, and then to get the total time (in minutes) associated with 
     //those factors. Placing them onto the U.M. record.
-    private Utilization_Metric__c putOperatingHours (Utilization_Metric__c record, AssignedResource ar){
+    private Utilization_Metric__c putOperatingHours (Utilication_Metric__c record, ServiceTerritoryMember stm){
         String dayOfWeek = getDayOfWeek(getDayOfWeekInt());
-        Id operatingHoursId = getOperatingHoursId(record.Service_Territory__c);
+        Id operatingHoursId = getOperatingHoursId(stm.Service_Territory__c);
         if (operatingHoursId != null){
             System.debug('the operating hours id is ' + operatingHoursId);
             List<TimeSlot> timeSlots = getTimeSlots(dayOfWeek, operatingHoursId);
