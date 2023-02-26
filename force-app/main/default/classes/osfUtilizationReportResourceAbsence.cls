@@ -11,7 +11,7 @@
             //ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType,
             // ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceAppointment.ServiceTerritory.Name, ServiceResource.Name FROM AssignedResource  
             //WHERE Created_Utilization_Metric__c = false' + (Test.isRunningTest()?' LIMIT 5':'');
-            STRING queryString = 'SELECT Id, Start, End, FSL__Duration_In_Minutes__c FROM ResourceAbsence WHERE resourceId =: ar.ServiceResourceId AND Start_Day__c =: this.startDate';
+            STRING queryString = 'SELECT Id, Start,Start_Day__c, End, FSL__Duration_In_Minutes__c FROM ResourceAbsence WHERE WHERE Created_Utilization_Metric__c = false  ServiceResource.ResourceType = \'T\' ' + (Test.isRunningTest()?' LIMIT 5':'');
             return Database.getQueryLocator(queryString);
         }
     
@@ -21,11 +21,11 @@
             System.debug('the scope is ' + scope.size());
             //call your batch method here, or just write your logic instead.
             try {
-                for(AssignedResource ar: scope){
+                for(ResourceAbsence ra: scope){
                         Utilization_Metric__c record = new Utilization_Metric__c();
-                        record = performBatchActions(ar);
+                        record = performBatchActions(ra);
                         this.records.add(record);
-                        ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
+                        ra.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
                         // System.debug('the ar scope id of this is ' + ar.id);
                         // System.debug('the record records id of this is ' + record.id);
                     }
@@ -45,22 +45,19 @@
     
     
         //"Parent" method that executes the order of data compilation
-        public Utilization_Metric__c performBatchActions( AssignedResource ar){
-            this.startDateTime = ar.ServiceAppointment.SchedStartTime;
-            this.startDate = this.startDateTime.dateGMT();
+        public Utilization_Metric__c performBatchActions( ResourceAbsence ra){
+            this.startDateTime = ra.start;
+            this.startDate = ra.Start_Day__c;
     
-            Utilization_Metric__c record = findUtilizationMetricRecord(ar);
-            record = putServiceAppointmentDurations(record, ar);
-            record = putResourceAbsences(record, ar);
-            record = putTravelTime(record, ar); //using EstimatedTravelTime. In Dev environment no ActualTravelTime is used. Also, to use ActualTravelTime means that we are back updating which isn't true.
-            record = putOperatingHours(record, ar);
+            Utilization_Metric__c record = findUtilizationMetricRecord(ra);
+            record = putResourceAbsences(record, ra);
             return record;
             //to see the result see Utilization Metric Record's Utilization__c value
         }
     
         //an if/else that locates an existing U.M. record based on Date, Serv. Territory Id, and Service Resource Id
         private  Utilization_Metric__c findUtilizationMetricRecord (AssignedResource ar){
-            Id serviceTerritoryId =  ar.ServiceAppointment.ServiceTerritoryID;
+            Id serviceTerritoryId =  ra.ServiceAppointment.ServiceTerritoryID;
             List<Utilization_Metric__c> umRecords = new List<Utilization_Metric__c>();
             umRecords = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Service_Resource_Name__c, Report_Start_Date__c, Service_Territory__c , Service_Territory_Name__c FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
             if (umRecords.size() == 0){ //no U.M. record was ever made in the past so make one
@@ -80,7 +77,7 @@
         }
     
         //if no U.M. record was found then create new record with Start Date, Service Resource Id/  Name, and Service Territory Id/Name, and the minutes of the times
-        private  Utilization_Metric__c createUtilizationMetricRecord(AssignedResource ar){
+        private  Utilization_Metric__c createUtilizationMetricRecord(ResourceAbsence ra){
             Utilization_Metric__c newUtilizationMetric = new Utilization_Metric__c();
             newUtilizationMetric.Report_Start_Date__c = this.startDate;
             newUtilizationMetric.Service_Resource__c = ar.ServiceResourceId;
@@ -109,8 +106,8 @@
         }
     
         //a method for putting all the Resource Absences of a Service Resource onto the U.M. record
-        private Utilization_Metric__c putResourceAbsences (Utilization_Metric__c record, AssignedResource ar){
-            List<ResourceAbsence> resourceAbsences = [SELECT Id, Start, End, FSL__Duration_In_Minutes__c FROM ResourceAbsence WHERE resourceId =: ar.ServiceResourceId AND Start_Day__c =: this.startDate];
+        private Utilization_Metric__c putResourceAbsences (Utilization_Metric__c record, ResourceAbsence ra){
+            List<ResourceAbsence> resourceAbsences = [SELECT Id, Start, End, FSL__Duration_In_Minutes__c FROM ResourceAbsence WHERE resourceId =: ra.ServiceResourceId AND Start_Day__c =: this.startDate];
             Integer totalMinutesofAbsence;
             if (resourceAbsences != null && resourceAbsences.size() > 1){
                 totalMinutesofAbsence = minutesOfAbsence(resourceAbsences);
