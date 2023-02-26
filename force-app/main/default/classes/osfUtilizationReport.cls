@@ -1,13 +1,14 @@
 public without sharing class osfUtilizationReport implements Database.Batchable<sObject> {
     DateTime startDateTime;
     Date startDate;
+    Integer MondayHours, TuesdayHours, WednesdayHours, ThursdayHours, FridayHours, SaturdayHours, SundayHours;
     List<Utilization_Metric__c> records = new List<Utilization_Metric__c>();
 
 
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String queryString = 'SELECT ID, Date_Value_EffectiveStartDate__c,ServiceResource.Name, ServiceTerritory.Name, ServiceTerritory,OperatingHoursId, Created_Utilization_Metric__c, Date_Value_EffectiveEndDate__c, EffectiveEndDate, ServiceTerritoryId, ServiceResourceId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (Is_the_StartDate_a_Year_Or_Older__c = True AND Effectiveenddate = null) OR LastModifiedDate = TODAY OR Created_Utilization_Metric__c = false';
+        String queryString = 'SELECT ID, Date_Value_EffectiveStartDate__c,ServiceResource.Name, ServiceTerritory.Name, Created_Utilization_Metric__c, Date_Value_EffectiveEndDate__c, EffectiveEndDate, ServiceTerritoryId, ServiceResourceId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (Is_the_StartDate_a_Year_Or_Older__c = True AND Effectiveenddate = null) OR LastModifiedDate = TODAY OR Created_Utilization_Metric__c = false';
         return Database.getQueryLocator(queryString);
     }
 
@@ -72,11 +73,10 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
             newUtilizationMetric.Total_Travel__c = 0;
             newUtilizationMetric.Service_Territory_Name__c = stm.ServiceTerritory.Name;
             newUtilizationMetric.Service_Resource_Name__c = stm.ServiceResource.Name;
-            Integer hours  =  putOperatingHours(record.Report_Start_Date__c, stm);
+            Integer hours  =  putOperatingHours(startDay + i, stm);
             newUtilizationMetric.Total_Available_Hours__c = hours;
             newUtilizationMetric.Total_Available_Minutes__c = hours * 60;
-            //newUtilizationMetric.Test_Assigned_Resource__c = stm.ServiceResourceId;
-            //newUtilizationMetric = putOperatingHours(newUtilizationMetric, stm);
+
             this.records.add(newUtilizationMetric);
             }
     }
@@ -89,8 +89,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         String dayOfWeek = getDayOfWeek(getDayOfWeekInt(startDate));
         Id operatingHoursId = stm.ServiceTerritory.OperatingHoursId;
         if (operatingHoursId != null){
-            List<TimeSlot> timeSlots = getTimeSlots(dayOfWeek, operatingHoursId);
-            Integer totalHours = getTotalOperatingHours(timeSlots);
+            Integer totalHours = getTimeSlots(dayOfWeek, operatingHoursId);
             Integer totalMins = totalHours * 60;
             return totalHours;
         }else{
@@ -136,10 +135,77 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     }
 
     //returns the list of time slots given the operatinghoursId and the day of week.
-    private List<TimeSlot> getTimeSlots(String day, Id operationHoursId){
-        List<TimeSlot> timeSlots = [SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day];
-        return timeSlots;
+    private Integer getTimeSlots(String day, Id operationHoursId){
+        switch on day{
+            when 'Monday'{
+                if(this.MondayHours != null){
+                    return this.MondayHours;
+                }
+                else{
+                    this.MondayHours = getTotalOperatingHours([SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day]);
+                    return this.MondayHours;
+                }
+            }
+            when 'Tuesday'{
+                if(this.TuesdayHours != null){
+                    return this.TuesdayHours;
+                }
+                else{
+                    this.TuesdayHours = getTotalOperatingHours([SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day]);
+                    return this.TuesdayHours;
+                }            
+            }
+            when 'Wednesday' {
+                if(this.WednesdayHours != null){
+                    return this.WednesdayHours;
+                }
+                else{
+                    this.WednesdayHours = getTotalOperatingHours([SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day]);
+                    return this.WednesdayHours;
+                }
+            }
+            when 'Thursday'{
+                if(this.ThursdayHours != null){
+                    return this.ThursdayHours;
+                }
+                else{
+                    this.ThursdayHours = getTotalOperatingHours([SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day]);
+                    return this.ThursdayHours;
+                }
+            }
+            when 'Friday' {
+                if(this.FridayHours != null){
+                    return this.FridayHours;
+                }
+                else{
+                    this.FridayHours = getTotalOperatingHours([SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day]);
+                    return this.FridayHours;
+                    
+                }            
+            }
+            when 'Saturday'{
+                if(this.SaturdayHours != null){
+                    return this.SaturdayHours;
+                }
+                else{
+                    this.SaturdayHours = getTotalOperatingHours([SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day]);
+                    return this.SaturdayHours;
+                }            
+            }
+            when 'Sunday'  {
+                if(this.SundayHours != null){
+                    return this.SundayHours;
+                }
+                else{
+                    this.SundayHours = getTotalOperatingHours([SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day]);
+                    return this.SundayHours;
+                }            
+            }
+            when else {
+                return 1;
+                }
     }
+}
 
     //utilizes a custom field found on TimeSlots and multiplying the found hours by 60 to return minutes of operation given the timeslots
     private Integer getTotalOperatingHours(List<TimeSlot> timeSlots){

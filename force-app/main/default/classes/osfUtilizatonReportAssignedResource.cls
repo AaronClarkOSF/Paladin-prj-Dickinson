@@ -7,7 +7,7 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, Schedule_Start_Date__c, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceAppointment.ServiceTerritory.Name, ServiceResource.Name FROM AssignedResource  WHERE Created_Utilization_Metric__c = false' + (Test.isRunningTest()?' LIMIT 5':'');
+        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, Schedule_Start_Date__c, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceAppointment.ServiceTerritory.Name, ServiceResource.Name FROM AssignedResource  WHERE Created_Utilization_Metric__c = false AND ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\' ' + (Test.isRunningTest()?' LIMIT 5':'');
         return Database.getQueryLocator(queryString);
     }
 
@@ -21,7 +21,7 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
                     Utilization_Metric__c record = new Utilization_Metric__c();
                     record = performBatchActions(ar);
                     this.records.add(record);
-                    ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
+                   // ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
                     // System.debug('the ar scope id of this is ' + ar.id);
                     // System.debug('the record records id of this is ' + record.id);
                 }
