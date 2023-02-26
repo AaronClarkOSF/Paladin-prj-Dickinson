@@ -47,7 +47,7 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
 
         Utilization_Metric__c record = findUtilizationMetricRecord(ar);
         record = putServiceAppointmentDurations(record, ar);
-        record = putResourceAbsences(record, ar);
+        //record = putResourceAbsences(record, ar);
         record = putTravelTime(record, ar); //using EstimatedTravelTime. In Dev environment no ActualTravelTime is used. Also, to use ActualTravelTime means that we are back updating which isn't true.
         record = putOperatingHours(record, ar);
         return record;
