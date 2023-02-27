@@ -3,12 +3,13 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     Date startDate;
     Integer MondayHours, TuesdayHours, WednesdayHours, ThursdayHours, FridayHours, SaturdayHours, SundayHours;
     List<Utilization_Metric__c> records = new List<Utilization_Metric__c>();
+    List<AssignedResource> assResourceList = new List<AssignedResource>();
 
 
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String queryString = 'SELECT ID, Date_Value_EffectiveStartDate__c,ServiceResource.Name, ServiceTerritory.Name, Created_Utilization_Metric__c, Date_Value_EffectiveEndDate__c, EffectiveEndDate, ServiceTerritoryId, ServiceResourceId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\' AND Is_the_StartDate_a_Year_Or_Older__c = True AND Effectiveenddate = null) OR LastModifiedDate = TODAY OR Created_Utilization_Metric__c = false';
+        String queryString = 'SELECT ID, Date_Value_EffectiveStartDate__c,ServiceResource.Name, ServiceTerritory.Name, Created_Utilization_Metric__c, Date_Value_EffectiveEndDate__c, EffectiveEndDate, ServiceTerritoryId, ServiceResourceId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\' AND (EffectiveEndDate_Changed__c = TRUE OR Created_Utilization_Metric__c = false)';
         return Database.getQueryLocator(queryString);
     }
 
@@ -20,9 +21,11 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         try {
             for(ServiceTerritoryMember stm: scope){
                     performBatchActions(stm);
+                    stm.EffectiveEndDate_Changed__c = false;
                     stm.Created_Utilization_Metric__c = true;
             }
             update scope;
+            update this.assResourceList;
             insert this.records;
             
         }catch (Exception e) {
@@ -52,15 +55,30 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         if (umRecords.size() == 0){ //no U.M. record was ever made in the past so make one
             createUtilizationMetricRecords(stm, stm.Date_Value_EffectiveStartDate__c, stm.Date_Value_EffectiveEndDate__c);// aka create a set of Utilization Metric records as that means its probably a net new STM record.
         }else{
+            setAssignedResourceBackToOriginal(umRecords);
             delete umRecords;
             createUtilizationMetricRecords(stm, System.today(), stm.Date_Value_EffectiveEndDate__c);
             
         }   
     }
 
+    //set the assignedresource that may need to "recaste" their values on new umRecords. 
+    //the use case for this is if someone edited the enddate of a STMember to be shorter or longer, we want to make sure that we cut those dates off by deleting the "original UM records", ensuring
+    //that the  AssignedResource records still can be caste on the "new UM records" 
+    private void setAssignedResourceBackToOriginal(List<Utilization_Metric__c> umRecords){
+        List<AssignedResource> allAssResource = [SELECT Id, Created_Utilization_Metric__c , ServiceResourceId , ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c , ServiceAppointment.ServiceTerritoryID FROM AssignedResource];
+        List<AssignedResource> arList = new List<AssignedResource>();
+        for (Utilization_Metric__c umRecord: umRecords){
+            for (AssignedResource ass: allAssResource){
+                if (umRecord.Service_Resource__c == ass.ServiceResourceId && umRecord.Report_Start_Date__c == ass.Schedule_Start_Date__c && umRecord.Service_Territory__c == ass.ServiceAppointment.ServiceTerritoryID){
+                    ass.Created_Utilization_Metric__c = false;
+                    this.assResourceList.add(ass);
+                }
+            }
+        }
+    }
     //if no U.M. record was found then create new record with Start Date, Service Resource Id/  Name, and Service Territory Id/Name, and the minutes of the times
     private  void createUtilizationMetricRecords(ServiceTerritoryMember stm, Date startDay, Date endDay){
-        System.debug('the stm is ' + stm + ' the startday is ' + startDay + ' the endday is ' + endDay);
         List<Utilization_Metric__c> umRecords = new List<Utilization_Metric__c>();
         Integer numberOfDays = (startDay.daysBetween(endDay));
         for (Integer i = 0; i < numberOfDays; i++){

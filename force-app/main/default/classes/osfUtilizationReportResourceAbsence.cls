@@ -7,10 +7,6 @@
         //query Assigned Resource
         public Database.QueryLocator start(Database.BatchableContext bc) {
             System.debug('***Batch Started***');
-            //String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, 
-            //ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType,
-            // ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceAppointment.ServiceTerritory.Name, ServiceResource.Name FROM AssignedResource  
-            //WHERE Created_Utilization_Metric__c = false' + (Test.isRunningTest()?' LIMIT 5':'');
             STRING queryString = 'SELECT Id, Start,Start_Day__c, End, FSL__Duration_In_Minutes__c FROM ResourceAbsence WHERE WHERE Created_Utilization_Metric__c = false AND ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\' ' + (Test.isRunningTest()?' LIMIT 5':'');
             return Database.getQueryLocator(queryString);
         }
