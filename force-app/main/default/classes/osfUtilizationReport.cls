@@ -9,7 +9,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String queryString = 'SELECT ID, Date_Value_EffectiveStartDate__c,ServiceResource.Name, ServiceTerritory.Name, Created_Utilization_Metric__c, Date_Value_EffectiveEndDate__c, EffectiveEndDate, ServiceTerritoryId, ServiceResourceId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\' AND (EffectiveEndDate_Changed__c = TRUE OR Created_Utilization_Metric__c = false))';
+        String queryString = 'SELECT ID, Date_Value_EffectiveStartDate__c,Add_365_Days_More_to_U_M_Records__c, ServiceResource.Name, ServiceTerritory.Name, Created_Utilization_Metric__c, Date_Value_EffectiveEndDate__c, EffectiveEndDate, ServiceTerritoryId, ServiceResourceId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\' AND (EffectiveEndDate_Changed__c = TRUE OR Created_Utilization_Metric__c = false OR Add_365_Days_More_to_U_M_Records__c = true ))';
         return Database.getQueryLocator(queryString);
     }
 
@@ -23,6 +23,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
                     performBatchActions(stm);
                     stm.EffectiveEndDate_Changed__c = false;
                     stm.Created_Utilization_Metric__c = true;
+                    stm.Add_365_Days_More_to_U_M_Records__c= false;
             }
             update scope;
             update this.assResourceList;
@@ -66,7 +67,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //the use case for this is if someone edited the enddate of a STMember to be shorter or longer, we want to make sure that we cut those dates off by deleting the "original UM records", ensuring
     //that the  AssignedResource records still can be caste on the "new UM records" 
     private void setAssignedResourceBackToOriginal(List<Utilization_Metric__c> umRecords){
-        List<AssignedResource> allAssResource = [SELECT Id, Created_Utilization_Metric__c , ServiceResourceId , ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c , ServiceAppointment.ServiceTerritoryID FROM AssignedResource];
+        List<AssignedResource> allAssResource = [SELECT Id, Created_Utilization_Metric__c , ServiceResourceId ,Schedule_Start_Date__c, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c , ServiceAppointment.ServiceTerritoryID FROM AssignedResource];
         List<AssignedResource> arList = new List<AssignedResource>();
         for (Utilization_Metric__c umRecord: umRecords){
             for (AssignedResource ass: allAssResource){

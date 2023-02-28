@@ -21,7 +21,7 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
                     Utilization_Metric__c record = new Utilization_Metric__c();
                     record = performBatchActions(ar);
                     this.records.add(record);
-                   // ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
+                    ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
                     // System.debug('the ar scope id of this is ' + ar.id);
                     // System.debug('the record records id of this is ' + record.id);
                 }
