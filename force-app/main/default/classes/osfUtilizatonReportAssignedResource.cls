@@ -22,8 +22,6 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
                     record = performBatchActions(ar);
                     this.records.add(record);
                     ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
-                    // System.debug('the ar scope id of this is ' + ar.id);
-                    // System.debug('the record records id of this is ' + record.id);
                 }
             update scope;
             upsert this.records;
@@ -62,14 +60,6 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
         if (umRecords.size() == 0){ //no U.M. record was ever made in the past so make one
             return createUtilizationMetricRecord(ar);
         }else{
-            /* for (Integer i = 0; i <this.records.size(); i++){ // one U.M. was already made during this batch (either made or found with umRecords[0] see below) and we should be re-reupdating it
-                if (this.records[i].Id == umRecords[0].Id){
-                    Utilization_Metric__c recordAlreadyMade = this.records[i];
-                    this.records.remove(i);
-                    return recordAlreadyMade;
-                }
-            }
-        }*/
             System.debug('the record st that we found was  ' + records[0].Service_Territory__c);
             return umRecords[0]; // no U.M. record was made in this batch  but one had been made previously
         }   
@@ -141,7 +131,6 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
         String dayOfWeek = getDayOfWeek(getDayOfWeekInt());
         Id operatingHoursId = getOperatingHoursId(record.Service_Territory__c);
         if (operatingHoursId != null){
-            System.debug('the operating hours id is ' + operatingHoursId);
             List<TimeSlot> timeSlots = getTimeSlots(dayOfWeek, operatingHoursId);
             Integer totalHours = getTotalOperatingHours(timeSlots);
             Integer totalMins = totalHours * 60;
