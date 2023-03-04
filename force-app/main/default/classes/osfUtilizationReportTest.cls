@@ -20,9 +20,9 @@ public with sharing class osfUtilizationReportTest {
         insert servApp;
         AssignedResource ar = new AssignedResource (ServiceAppointmentId = servApp.Id, ServiceResourceId = servRes.Id);
         insert ar;
-        ResourceAbsence ra1= new ResourceAbsence (Start = System.now(), End =System.now().addHours(1), resourceId = servRes.Id );
+        ResourceAbsence ra1= new ResourceAbsence (Start = System.now(), End = System.now().addHours(1), resourceId = servRes.Id );
         insert ra1;
-        ResourceAbsence ra2= new ResourceAbsence (Start = System.now().addHours(2), End =System.now().addHours(3), resourceId = servRes.Id );
+        ResourceAbsence ra2= new ResourceAbsence (Start = System.now().addHours(2), End = System.now().addHours(3), resourceId = servRes.Id );
         insert ra2;
     }
     
