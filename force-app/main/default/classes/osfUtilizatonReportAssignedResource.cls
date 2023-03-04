@@ -2,13 +2,18 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
     DateTime startDateTime;
     Date startDate;
     List<Utilization_Metric__c> records = new List<Utilization_Metric__c>();
+    Date ninetyDaysAgo = Date.today().addDays(-90);
+    Date ninetyDaysFuture =  Date.today().addDays(90);
 
 
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, Schedule_Start_Date__c, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceAppointment.ServiceTerritory.Name, ServiceResource.Name FROM AssignedResource  WHERE Created_Utilization_Metric__c = false AND ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\' ' + (Test.isRunningTest()?' LIMIT 5':'');
+        
+        String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, Schedule_Start_Date__c, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceAppointment.ServiceTerritory.Name, ServiceResource.Name FROM AssignedResource  WHERE Schedule_Start_Date__c >= LAST_90_DAYS AND Schedule_Start_Date__c <= NEXT_90_DAYS AND Created_Utilization_Metric__c = False AND ServiceResource.IsActive = True AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\' ' + (Test.isRunningTest()?' LIMIT 5':'');
         return Database.getQueryLocator(queryString);
+
+      //  return queryLocator;
     }
 
     //Perform actions to create or update the existing U.M. records based on Service Resource and Service Territory
@@ -22,9 +27,13 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
                     record = performBatchActions(ar);
                     this.records.add(record);
                     ar.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" AssignedResource checkbox so it doesn't get reupdated incorrectly
+                    System.debug('we have added ' + record.Id +  ' to this.records');
                 }
+
+            Set<Utilization_Metric__c> myObjectSet = new Set<Utilization_Metric__c>(this.records);
+            List<Utilization_Metric__c> myObjectList = new List<Utilization_Metric__c>(myObjectSet);
             update scope;
-            upsert this.records;
+            upsert myObjectList;
             
         }catch (Exception e) {
             System.debug('BATCH ERROR ===> ' + e);
@@ -41,8 +50,7 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
     //"Parent" method that executes the order of data compilation
     public Utilization_Metric__c performBatchActions( AssignedResource ar){
         this.startDateTime = ar.ServiceAppointment.SchedStartTime;
-        this.startDate = ar.Schedule_Start_Date__c;
-
+        this.startDate = this.startDateTime.date();
         Utilization_Metric__c record = findUtilizationMetricRecord(ar);
         record = putServiceAppointmentDurations(record, ar);
         //record = putResourceAbsences(record, ar);
@@ -56,13 +64,34 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
     private  Utilization_Metric__c findUtilizationMetricRecord (AssignedResource ar){
         Id serviceTerritoryId =  ar.ServiceAppointment.ServiceTerritoryID;
         List<Utilization_Metric__c> umRecords = new List<Utilization_Metric__c>();
-        umRecords = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Service_Resource_Name__c, Report_Start_Date__c, Service_Territory__c , Service_Territory_Name__c FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: this.startDate AND Service_Territory__c =: serviceTerritoryId];
-        if (umRecords.size() == 0){ //no U.M. record was ever made in the past so make one
+        umRecords = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Service_Resource_Name__c, Report_Start_Date__c, Service_Territory__c , Service_Territory_Name__c FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: ar.Schedule_Start_Date__c AND Service_Territory__c =: serviceTerritoryId];
+        if (umRecords.size() == 0 || umRecords == null){ //no U.M. record was ever made in the past so make one
             return createUtilizationMetricRecord(ar);
         }else{
-            System.debug('the record st that we found was  ' + records[0].Service_Territory__c);
-            return umRecords[0]; // no U.M. record was made in this batch  but one had been made previously
-        }   
+            // System.debug(umRecords);
+            // System.debug(umRecords[0]);
+            // System.debug('the ar id is ' + ar.id);
+            // System.debug('the ar sr is ' + ar.ServiceResourceId);
+            // System.debug('the ar st is ' + serviceTerritoryId);
+            // System.debug('the ar start date is ' + ar.Schedule_Start_Date__c);
+
+
+            // System.debug('the um is ' + umRecords[0].Id);
+            // System.debug('the record sr that we found was ' + umRecords[0].Service_Resource__c);
+            // System.debug('the date is ' + umRecords[0].Report_Start_Date__c);
+            // System.debug('the record st that we found was  ' + umRecords[0].Service_Territory__c);
+            
+            for(Utilization_Metric__c umExist : this.records){
+                if (umRecords[0].Id == umExist.Id){
+                    return umExist;
+                }
+                else{
+                    System.debug('we did not find what we wanted so we are returning ' + umRecords[0]);
+                }
+            }
+        
+            return umRecords[0];
+        }
     }
 
     //if no U.M. record was found then create new record with Start Date, Service Resource Id/  Name, and Service Territory Id/Name, and the minutes of the times
