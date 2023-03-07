@@ -9,7 +9,6 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        
         String queryString = 'SELECT ID, ServiceAppointmentId, lastmodifiedby.name, createddate, Schedule_Start_Date__c, lastmodifieddate, ServiceAppointment.SchedStartTime, EstimatedTravelTime, ServiceResourceId, ActualTravelTime, ServiceAppointment.AppointmentNumber,ServiceAppointment.Schedule_Start_Day__c, ServiceAppointment.DurationType, ServiceAppointment.Duration, ServiceAppointment.ServiceTerritoryID, ServiceAppointment.ServiceTerritory.Name, ServiceResource.Name FROM AssignedResource  WHERE Schedule_Start_Date__c >= LAST_90_DAYS AND Schedule_Start_Date__c <= NEXT_90_DAYS AND Created_Utilization_Metric__c = False AND ServiceResource.IsActive = True AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\' ' + (Test.isRunningTest()?' LIMIT 5':'');
         return Database.getQueryLocator(queryString);
 

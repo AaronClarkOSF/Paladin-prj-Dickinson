@@ -22,8 +22,6 @@
                         recordsFromRA = performBatchActions(ra);
                         this.records.addall(recordsFromRA);
                         ra.Created_Utilization_Metric__c = true; // after you finish creating/updating the U.M. record, mark the "parent" ResourceAbsence checkbox so it doesn't get reupdated incorrectly
-                        // System.debug('the ar scope id of this is ' + ar.id);
-                        // System.debug('the record records id of this is ' + record.id);
                     }
                 Set<Utilization_Metric__c> myObjectSet = new Set<Utilization_Metric__c>(this.records);
                 List<Utilization_Metric__c> myObjectList = new List<Utilization_Metric__c>(myObjectSet);

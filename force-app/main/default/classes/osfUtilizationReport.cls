@@ -13,8 +13,6 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String exampleDate = this.ninetyDaysAgo.format();
-        System.debug('today - 90 is ' +  exampleDate);
         String queryString = 'SELECT ID, Date_Value_EffectiveStartDate__c,Add_365_Days_More_to_U_M_Records__c, ServiceResource.Name, ServiceTerritory.Name, Created_Utilization_Metric__c, Date_Value_EffectiveEndDate__c, EffectiveEndDate, ServiceTerritoryId, ServiceResourceId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\')';
         return Database.getQueryLocator(queryString);
     }
