@@ -10,7 +10,7 @@ public with sharing class osfUtilizationReportTest {
         insert servTerr;
         ServiceResource servRes = new ServiceResource(Name='Test', IsActive = true , ResourceType = 'T', RelatedRecordId = UserInfo.getUserId());
         insert servRes;
-        ServiceTerritoryMember servTM = new ServiceTerritoryMember(ServiceResourceId = servRes.Id, ServiceTerritoryId = servTerr.Id, TerritoryType = 'P', EffectiveStartDate = System.today()-5);
+        ServiceTerritoryMember servTM = new ServiceTerritoryMember(ServiceResourceId = servRes.Id, ServiceTerritoryId = servTerr.Id, TerritoryType = 'P');
         insert servTM;
         WorkType wT = new WorkType(Name='Test WT', EstimatedDuration = 1, DurationType = 'Hours');
         insert wT;
