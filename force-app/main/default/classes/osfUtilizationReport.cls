@@ -7,13 +7,14 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     List<AssignedResource> assResourceList = new List<AssignedResource>();
     Date ninetyDaysAgo = Date.today().addDays(-90);
     Date ninetyDaysFuture =  Date.today().addDays(90);
+    String currentSTM;
 
 
 
     //query Assigned Resource
     public Database.QueryLocator start(Database.BatchableContext bc) {
         System.debug('***Batch Started***');
-        String queryString = 'SELECT ID, ServiceResource.Name, ServiceTerritory.Name, Created_Utilization_Metric__c, ServiceTerritoryId, ServiceResourceId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\')';
+        String queryString = 'SELECT ID, ServiceResource.Name, ServiceTerritory.Name, Created_Utilization_Metric__c, ServiceTerritoryId, ServiceResourceId, OperatingHoursId, ServiceTerritory.OperatingHoursId FROM ServiceTerritoryMember WHERE (ServiceResource.IsActive = TRUE AND ServiceResource.RelatedRecord.IsActive = TRUE AND ServiceResource.ResourceType = \'T\')';
         return Database.getQueryLocator(queryString);
     }
 
@@ -71,6 +72,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     }
     //if no U.M. record was found then create new record with Start Date, Service Resource Id/  Name, and Service Territory Id/Name, and the minutes of the times
     private  void createUtilizationMetricRecordSet(ServiceTerritoryMember stm, Date startDay, Date endDay){
+        this.currentSTM = stm.Id;
         List<Utilization_Metric__c> umRecords = new List<Utilization_Metric__c>();
         Integer numberOfDays = (startDay.daysBetween(endDay));
         for (Integer i = 0; i < numberOfDays; i++){
@@ -83,9 +85,11 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
             newUtilizationMetric.Total_Travel__c = 0;
             newUtilizationMetric.Service_Territory_Name__c = stm.ServiceTerritory.Name;
             newUtilizationMetric.Service_Resource_Name__c = stm.ServiceResource.Name;
+            newUtilizationMetric.Service_Territory_Member_Id__c = stm.Id;
             Integer hours  =  putOperatingHours(startDay + i, stm);
             newUtilizationMetric.Total_Available_Hours__c = hours;
             newUtilizationMetric.Total_Available_Minutes__c = hours * 60;
+            System.debug('the total available mins are ' + newUtilizationMetric.Total_Available_Minutes__c);
 
             this.records.add(newUtilizationMetric);
             }
@@ -102,9 +106,11 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
             newUtilizationMetric.Total_Travel__c = 0;
             newUtilizationMetric.Service_Territory_Name__c = stm.ServiceTerritory.Name;
             newUtilizationMetric.Service_Resource_Name__c = stm.ServiceResource.Name;
+            newUtilizationMetric.Service_Territory_Member_Id__c = stm.Id;
             Integer hours  =  putOperatingHours(startDay, stm);
             newUtilizationMetric.Total_Available_Hours__c = hours;
             newUtilizationMetric.Total_Available_Minutes__c = hours * 60;
+            System.debug('the total available mins are ' + newUtilizationMetric.Total_Available_Minutes__c);
 
             this.records.add(newUtilizationMetric);
     }
@@ -115,13 +121,16 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
     //those factors. Placing them onto the U.M. record.
     private Integer putOperatingHours (Date startDate, ServiceTerritoryMember stm){
         String dayOfWeek = getDayOfWeek(getDayOfWeekInt(startDate));
-        Id operatingHoursId = stm.ServiceTerritory.OperatingHoursId;
+        System.debug('the stm operating hours is ' + stm.OperatingHoursId);
+        Id operatingHoursId = stm.OperatingHoursId;
         if (operatingHoursId != null){
-            Integer totalHours = getTimeSlots(dayOfWeek, operatingHoursId);
-            Integer totalMins = totalHours * 60;
+            System.debug('the operating hours is ' + operatingHoursId);
+            Integer totalHours = getTimeSlots(dayOfWeek, operatingHoursId, stm);
             return totalHours;
         }else{
-            return 8; // if no operating id is associated with the Service Territory, just make it a standard 8 hours of work so that the calculation doesn't break
+            //if no Operating Hours is associated with the STM then look at the ST
+            Integer totalHours = getTimeSlots(dayOfWeek, stm.ServiceTerritory.OperatingHoursId, stm);
+            return totalHours;
         }
     }
 
@@ -162,20 +171,37 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
          }
     }
 
+    private void nullifyDayHours(){
+        this.MondayHours = null;
+        this.TuesdayHours = null;
+        this.WednesdayHours = null;
+        this.ThursdayHours = null;
+        this.FridayHours = null;
+        this.SaturdayHours = null;
+        this.SundayHours = null;
+    }
+
     //returns the list of time slots given the operatinghoursId and the day of week.
-    private Integer getTimeSlots(String day, Id operationHoursId){
+    private Integer getTimeSlots(String day, Id operationHoursId,ServiceTerritoryMember stm ){
+        if (this.currentSTM != stm.Id){
+            nullifyDayHours();
+        }
         switch on day{
             when 'Monday'{
-                if(this.MondayHours != null){
+                if(this.MondayHours != null && this.MondayHours != 0){
+                    System.debug('the monday hours in the if is ' + this.MondayHours);
                     return this.MondayHours;
                 }
                 else{
                     this.MondayHours = getTotalOperatingHours([SELECT ID, StartTime, EndTime, Total_Hours__c FROM TimeSlot WHERE OperatingHoursId =: operationHoursId AND DayOfWeek =: day]);
+                    System.debug('the monday hours in the else is ' + this.MondayHours);
+                    System.debug('the operating hours was ' + operationHoursId);
+                    System.debug('the day is ' + day);
                     return this.MondayHours;
                 }
             }
             when 'Tuesday'{
-                if(this.TuesdayHours != null){
+                if(this.TuesdayHours != null && this.TuesdayHours != 0){
                     return this.TuesdayHours;
                 }
                 else{
@@ -184,7 +210,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
                 }            
             }
             when 'Wednesday' {
-                if(this.WednesdayHours != null){
+                if(this.WednesdayHours != null && this.WednesdayHours == 0){
                     return this.WednesdayHours;
                 }
                 else{
@@ -193,7 +219,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
                 }
             }
             when 'Thursday'{
-                if(this.ThursdayHours != null){
+                if(this.ThursdayHours != null && this.ThursdayHours == 0){
                     return this.ThursdayHours;
                 }
                 else{
@@ -202,7 +228,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
                 }
             }
             when 'Friday' {
-                if(this.FridayHours != null){
+                if(this.FridayHours != null && this.FridayHours == 0){
                     return this.FridayHours;
                 }
                 else{
@@ -212,7 +238,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
                 }            
             }
             when 'Saturday'{
-                if(this.SaturdayHours != null){
+                if(this.SaturdayHours != null && this.SaturdayHours == 0){
                     return this.SaturdayHours;
                 }
                 else{
@@ -221,7 +247,7 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
                 }            
             }
             when 'Sunday'  {
-                if(this.SundayHours != null){
+                if(this.SundayHours != null && this.SundayHours == 0){
                     return this.SundayHours;
                 }
                 else{
@@ -241,7 +267,8 @@ public without sharing class osfUtilizationReport implements Database.Batchable<
         for (TimeSlot ts: timeSlots){
             totalOperatingHours += ts.Total_Hours__c; 
         }
-        return (Integer) totalOperatingHours;
+        return totalOperatingHours == 0 ? 8 : (Integer) totalOperatingHours;
+        //return (Integer) totalOperatingHours;
     }
 
 }

@@ -49,7 +49,7 @@
             System.debug('the first round of records found was ' + records);
 
             records = putResourceAbsences(records, ra);
-            records = putOperatingHours(records, ra);
+            //records = putOperatingHours(records, ra);
 
             return records;
             //to see the result see Utilization Metric Record's Utilization__c value
@@ -156,7 +156,6 @@
             for(Utilization_Metric__c record: records){
                 Id operatingHoursId = getOperatingHoursId(record.Service_Territory__c);
                 if (operatingHoursId != null){
-                    System.debug('the operating hours id is ' + operatingHoursId);
                     List<TimeSlot> timeSlots = getTimeSlots(dayOfWeek, operatingHoursId);
                     Integer totalHours = getTotalOperatingHours(timeSlots);
                     Integer totalMins = totalHours * 60;
@@ -167,7 +166,8 @@
                         record.Total_Available_Minutes__c = 480;
                     }
         
-                }else{
+                }
+                else{
                     record.Total_Available_Hours__c = 8; // if no operating id is associated with the Service Territory, just make it a standard 8 hours of work so that the calculation doesn't break
                     record.Total_Available_Minutes__c = 480;
                 }

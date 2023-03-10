@@ -52,9 +52,7 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
         this.startDate = this.startDateTime.date();
         Utilization_Metric__c record = findUtilizationMetricRecord(ar);
         record = putServiceAppointmentDurations(record, ar);
-        //record = putResourceAbsences(record, ar);
         record = putTravelTime(record, ar); //using EstimatedTravelTime. In Dev environment no ActualTravelTime is used. Also, to use ActualTravelTime means that we are back updating which isn't true.
-        record = putOperatingHours(record, ar);
         return record;
         //to see the result see Utilization Metric Record's Utilization__c value
     }
@@ -66,20 +64,7 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
         umRecords = [SELECT ID, Total_Scheduled__c,Total_NAs__c,Total_Available_Hours__c, Total_Available_Minutes__c, Total_Travel__c, Service_Resource__c, Service_Resource_Name__c, Report_Start_Date__c, Service_Territory__c , Service_Territory_Name__c FROM Utilization_Metric__c WHERE Service_Resource__c =: ar.ServiceResourceId AND  Report_Start_Date__c =: ar.Schedule_Start_Date__c AND Service_Territory__c =: serviceTerritoryId];
         if (umRecords.size() == 0 || umRecords == null){ //no U.M. record was ever made in the past so make one
             return createUtilizationMetricRecord(ar);
-        }else{
-            // System.debug(umRecords);
-            // System.debug(umRecords[0]);
-            // System.debug('the ar id is ' + ar.id);
-            // System.debug('the ar sr is ' + ar.ServiceResourceId);
-            // System.debug('the ar st is ' + serviceTerritoryId);
-            // System.debug('the ar start date is ' + ar.Schedule_Start_Date__c);
-
-
-            // System.debug('the um is ' + umRecords[0].Id);
-            // System.debug('the record sr that we found was ' + umRecords[0].Service_Resource__c);
-            // System.debug('the date is ' + umRecords[0].Report_Start_Date__c);
-            // System.debug('the record st that we found was  ' + umRecords[0].Service_Territory__c);
-            
+        }else{            
             for(Utilization_Metric__c umExist : this.records){
                 if (umRecords[0].Id == umExist.Id){
                     return umExist;
@@ -107,6 +92,7 @@ public without sharing class osfUtilizatonReportAssignedResource implements Data
         newUtilizationMetric.Service_Territory_Name__c = ar.ServiceAppointment.ServiceTerritory.Name;
         newUtilizationMetric.Service_Resource_Name__c = ar.ServiceResource.Name;
         newUtilizationMetric.Test_Assigned_Resource__c = ar.Id;
+        newUtilizationMetric = putOperatingHours(newUtilizationMetric, ar);
         return newUtilizationMetric;
     }
     
